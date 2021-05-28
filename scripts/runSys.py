@@ -1,0 +1,54 @@
+from brownie import *
+
+def main():
+    accounts.load('main_account')
+    factory = deploy_base_contracts() 
+    init_wallet(factory)
+    iToken = "0x7343b25c4953f4C57ED4D16c33cbEDEFAE9E8Eb9"
+    ercToken = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56"
+    setApprovalForWallet(factory,ercToken,iToken)
+    trader = factory.getSmartWallet.call(accounts[0])
+    nonce = "1"
+    submitTrade(Contract.from_abi("SmartWallet",factory.getSmartWallet.call(accounts[0]),SmartWallet.abi))
+    executeOrder(factory,trader,nonce)
+    
+def deploy_base_contracts():
+    factoryContract = walletFactor.deploy({'from':accounts[0]}) #deploy factory
+    walletCreation = walletCreator.deploy({'from':accounts[0]}) #deploy wallet generator
+    walletCreation.setFact(factoryContract.address,{'from':accounts[0]}) #assign the factory address to the generator
+    factoryContract.setGenerator(walletCreation.address,{'from':accounts[0]}) #assign generatory address to factory
+    return factoryContract
+def init_wallet(factory):
+    factory.createSmartWallet({'from':accounts[0]}) #create a smart wallet
+    mySmartWallet = factory.getSmartWallet.call(accounts[0])
+    BUSD = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56"
+    ERC20 = interface.IERC(BUSD)
+    ERC20.transfer(mySmartWallet,1*10**16,{"from":accounts[0]}) #transfer 0.01 BUSD to smart wallet address as a deposit
+def setApprovalForWallet(factory,iERC,spender):
+    myWall = factory.getSmartWallet.call(accounts[0])
+    smartWallet = Contract.from_abi("SmartWallet",myWall,SmartWallet.abi)
+    smartWallet.approveERCSpending(iERC,spender,1000*10**18,{'from':accounts[0]})
+def submitTrade(smartWallet):
+    loanID = "0x0000000000000000000000000000000000000000000000000000000000000000" #ID of loan, set to loan id if the order is for modifying or closing an active position
+    feeAmount = "1" #fee amount denominated in the token that is being used
+    iToken = "0x7343b25c4953f4C57ED4D16c33cbEDEFAE9E8Eb9" #iToken contract address which is the iToken for the currency you want to borrow
+    price = str(400*10**18) #execution price of order
+    leverage = "2000000000000000000" #leverage for position
+    lTokenAmount = str(9*10**15) #loan token amount
+    cTokenAmount = "0" #collateral token amount
+    isActive = True #does not affect for order placement
+    base = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c" #collateral token address
+    isCollateral = False #only required for closing position orders, carries no effect otherwise
+    nonce = "1" #has no effect
+    orderType = "0" #0: limit open position 1: limit close position 2: market stop position
+    trader = "0x7343b25c4953f4C57ED4D16c33cbEDEFAE9E8Eb9" #does not matter what is inputted here
+    tradeOrderStruct = [trader,loanID,feeAmount,iToken,price,leverage,lTokenAmount,cTokenAmount,isActive,base,orderType,isCollateral,nonce]
+    smartWallet.submitOrder(tradeOrderStruct,{'from':accounts[0]})
+    
+def executeOrder(factory,trader,nonce):
+    if(factory.checkIfExecutable.call(trader,nonce)):
+        factory.executeOrder(trader,nonce,{'from':accounts[0]})
+    else:
+        print('not executable')
+    
+    
