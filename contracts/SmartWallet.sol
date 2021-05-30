@@ -4,15 +4,8 @@ import "./bZxInterfaces/IBZx.sol";
 import "./IERC.sol";
 import "./IWalletFactor.sol";
 import "./FactoryEvents.sol";
-contract SmartWallet is MainWalletEvents{
-    address internal owner;
-    address internal factoryContract;
-    address internal BNBAddress = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
-    constructor(address setOwnership,address setFactoryContract){
-        owner = setOwnership;
-        factoryContract = setFactoryContract;
-        //ProtocolLike(bZxRouter).priceFeeds()
-    }
+import "./SmartWalletStorage.sol";
+contract SmartWallet is MainWalletEvents,SmartWalletStorage{
     modifier onlyFactory(){
         require(msg.sender == factoryContract,"not factory");_;
     }

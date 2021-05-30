@@ -1,8 +1,9 @@
 pragma solidity ^0.8.4;
-import "./SmartWallet.sol";
+import "./SmartWalletProxy.sol";
 contract walletCreator{
     address internal factory;
     address internal owner;
+	
     modifier onlyFactory(){
         require(msg.sender == factory);_;
     }
@@ -16,7 +17,7 @@ contract walletCreator{
         factory = newtarget;
     }
     function launchWallet(address nOwner) public onlyFactory() returns(address){
-        SmartWallet newSmartWallet = new SmartWallet(nOwner,factory);
+        SmartWalletProxy newSmartWallet = new SmartWalletProxy(nOwner,factory);
         return newSmartWallet.getAddress();
     }
 }
