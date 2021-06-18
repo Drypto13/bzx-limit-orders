@@ -1,0 +1,38 @@
+﻿Topic:
+Develop a margin trading model for integration with Synthetix
+
+
+Hurdles:
+SIP-37 (settling fees after the trade in accordance with price changes on oracle)
+
+
+High-Level Solution:
+Segregated contracts for borrowers that exist to handle executions in and custody funds while trading on bZx (think of as deposit contracts)
+
+
+Initialization process:
+The structure of Synthetix protocol makes it so swapping from one synth to another has a timelock system after the swap to charge extra fees. This means the current design of the bZx contracts is insufficient because there cannot be only one central contract where all trades execute because of the timelock. To get around this, there needs to be the ability for segregated contracts to be used by each unique user/wallet. This will separate the timelocks and allow for settling fees to occur properly for each user and not have extra or fewer fees charged because of numerous traders executing from the same contract. The process for onboarding users would be the user initiates the creation of a deposit contract for sUSD and the main protocol contract creates the deposit contract for the user. From here, the user deposits their sUSD into the contract and can now start to margin trade based on this balance. 
+
+
+Opening a Margin Trade:
+When the user initiates a margin, the user will specify how much of the sUSD balance to use as collateral and the leverage to use. The leveraged amount will be borrowed from the sUSD lending pool. The user submits the trade which results in the sUSD being borrowed and it is swapped for the other synthetic asset on the Synthetix Exchange. This causes a timelock to occur. The user is now unable to swap the destination synth back to sUSD or any other synth (synthetix allows for swapping back to the source but this will be disallowed for margin trading) until the oracle rate is updated and the timelock ends for the destination synth. From this point, the user has the optionality to call settle themselves to immediately settle the fees outstanding. This will result in the destination synth balance changing (may increase or decrease) which means when the fees are settled, it will need to be updated on the protocol’s loan info. The protocol will also need keepers to execute the settlement to ensure updated balances if the user does not settle fees in a timely manner (this can be decided upon how much time the user has to settle and the fees charged to settle for the user). From this point, it functions as a normal margin loan as the fees are all settled. The synthetix pricing oracle can be used to retrieve valuations for the synths. 
+
+
+Liquidation:
+In the event of a liquidation occurring, the liquidator will transfer the borrowed sUSD and receive the full amount of the destination synth. If for some unforeseen reason the fees have not been settled by this time, the liquidation function will have the ability to settle fees. 
+
+
+Closing Trade:
+When the user decides to close the trade, the destination synth is immediately swapped back to sUSD. This will result in a time lock occurring and the user cannot withdraw the acquired sUSD. From this point, the user will have to wait for the oracle to update to settle the fees and fully pay off the loan. To ensure the user will settle the fees as soon as possible, interest will still be accruing on the borrowed amount even after the trade is closed and during the timelock. After the loan has been paid off, the user is free to withdraw the sUSD from their deposit contract or keep it in to execute a new trade.
+
+
+Adding size to a trade:
+In the event the trader wants to add to their trade, they are free to do so and it follows a similar procedure as opening a trade. sUSD will be borrowed and the user will have the option to settle the fees or a keeper will be incentivized to handle it.
+
+
+Decreasing size of a trade:
+Decreasing the size of a trade is also possible by swapping the destination synth for sUSD. The user has the option to settle the fees of this swap themself or rely on a keeper.
+
+
+Trading numerous assets at once:
+The trades use an isolated margin approach and based on the SIP-37 model, there are no limitations on trading different synths at the same time using the same source synth, as long as the source synth is not the same as a destination synth.
