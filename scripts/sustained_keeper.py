@@ -13,7 +13,7 @@ def loop_check():
         totalActiveTrades = factoryContract.getTotalOrders.call(x)
         for y in factoryContract.getActiveOrderIDs.call(x,0,totalActiveTrades):
             if factoryContract.checkIfExecutable.call(x,y):
-                print('executable')
+                factoryContract.executeOrder(x,y,{'from':accounts[0]})
             else:
                 print('not executable')
     time.sleep(15)
