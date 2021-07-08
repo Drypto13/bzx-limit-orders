@@ -51,7 +51,7 @@ contract SmartWallet is MainWalletEvents,SmartWalletStorage{
         LoanToken(iToken).marginTrade(loanId,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
         success = true;
     }
-    function closePosition(bytes32 loanId,uint amount, bool iscollateral)  public{
+    function closePosition(bytes32 loanId,uint amount, bool iscollateral) onlyOwner() public{
         bytes memory arbData = "";
         IBZx(getBZXRouter()).closeWithSwap(loanId, address(this), amount, iscollateral, arbData);
     }
