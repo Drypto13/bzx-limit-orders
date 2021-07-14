@@ -6,8 +6,8 @@ from fixedint import *
 def shared_setup(module_isolation):
     pass
 @pytest.fixture(scope="module")
-def deploy_limit_contracts(accounts,walletFactor,SmartWallet,FactoryContractProxy,walletCreator):
-    factoryContract = walletFactor.deploy("0x420b1099B9eF5baba6D92029594eF45E19A04A4A",{'from':accounts[0]}) #deploy factory
+def deploy_limit_contracts(bzx,accounts,walletFactor,SmartWallet,FactoryContractProxy,walletCreator):
+    factoryContract = walletFactor.deploy(bzx.address,{'from':accounts[0]}) #deploy factory
     smartW = SmartWallet.deploy({'from':accounts[0]})
     proxyFactory = FactoryContractProxy.deploy({'from':accounts[0]})
     proxyFactory.setImpl(factoryContract.address,{'from':accounts[0]})
