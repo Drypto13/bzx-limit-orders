@@ -1,5 +1,5 @@
 pragma solidity ^0.8.4;
-abstract contract LoanToken{
+abstract contract LoanTokenI{
 	struct LoanOpenData{
 		bytes32 LoanId;
 		uint256 principal;

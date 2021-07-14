@@ -83,6 +83,6 @@ interface IPriceFeeds {
         view
         returns (uint256);
 }
-abstract contract State{
+abstract contract StateI{
     address public priceFeeds;
 }
