@@ -5,6 +5,7 @@ interface IWalletFactory{
         bytes32 loanID;
         uint feeAmount;
         address iToken;
+		address loanTokenAddress;
         uint price;
         uint leverage;
         uint loanTokenAmount;

@@ -10,7 +10,7 @@ contract SmartWallet is MainWalletEvents,SmartWalletStorage{
         require(msg.sender == factoryContract,"not factory");_;
     }
     modifier onlyOwner(){
-        require(msg.sender == owner);_;
+        require(msg.sender == owner, "not owner");_;
     }
     fallback() external payable{}
     receive() external payable{}
@@ -22,8 +22,8 @@ contract SmartWallet is MainWalletEvents,SmartWalletStorage{
     } 
     function executeTradeFactoryOpen(address payable keeper, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage, bytes32 lid,uint feeAmount) onlyFactory() public returns(bool success){
         bytes memory arbData = "";
-		LoanToken(iToken).marginTrade(lid,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
-        _safeTransfer(collateralAmount > loanTokenAmount ? collateralAddress : LoanToken(iToken).loanTokenAddress(),keeper,feeAmount,"");     
+		LoanTokenI(iToken).marginTrade(lid,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
+        _safeTransfer(collateralAmount > loanTokenAmount ? collateralAddress : LoanTokenI(iToken).loanTokenAddress(),keeper,feeAmount,"");     
         success = true;
     }
     function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint feeAmount) onlyFactory() public returns(bool success){
@@ -48,10 +48,10 @@ contract SmartWallet is MainWalletEvents,SmartWalletStorage{
     }
     function openPosition(bytes32 loanId, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage) onlyOwner() public returns(bool success){
         bytes memory arbData = "";
-        LoanToken(iToken).marginTrade(loanId,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
+        LoanTokenI(iToken).marginTrade(loanId,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
         success = true;
     }
-    function closePosition(bytes32 loanId,uint amount, bool iscollateral) onlyOwner() public{
+    function closePosition(bytes32 loanId,uint amount, bool iscollateral)  public{
         bytes memory arbData = "";
         IBZx(getBZXRouter()).closeWithSwap(loanId, address(this), amount, iscollateral, arbData);
     }
