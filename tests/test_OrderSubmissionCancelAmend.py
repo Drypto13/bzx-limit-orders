@@ -24,7 +24,7 @@ def deploy_smart_wallet(accounts,deploy_limit_contracts,LINK,SmartWallet):
     mySmartWallet = deploy_limit_contracts.getSmartWallet(accounts[0].address)
     sw = Contract.from_abi("SmartWallet",mySmartWallet,SmartWallet.abi)
     return deploy_limit_contracts, sw
-def test_order_submission(Constants, bzx, DAI, LINK, accounts, web3, deploy_smart_wallet,LoanToken):
+def test_orders(Constants, bzx, DAI, LINK, accounts, web3, deploy_smart_wallet,LoanToken):
     main_contract, smart_wallet = deploy_smart_wallet
     print(smart_wallet.getBZXRouter())
     smart_wallet.approveERCSpending(LINK.address,accounts[1],10000e18,{'from':accounts[0]})
