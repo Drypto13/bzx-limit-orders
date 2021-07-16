@@ -1,12 +1,12 @@
 from brownie import *
 
 def main():
-    accounts.load('main1')
-    walletFactor = "" #factory contract address
+    accounts.load('main3')
+    factoryContract = "0xDc9A918AA30e90B7B0984674013Db50a8D79F1Bc" #factory contract address
     factory = Contract.from_abi("walletFactor",factoryContract,walletFactor.abi)
     init_wallet(factory)
-    iToken = "0x7343b25c4953f4C57ED4D16c33cbEDEFAE9E8Eb9"
-    ercToken = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+    iToken = "0x2E1A74a16e3a9F8e3d825902Ab9fb87c606cB13f"
+    ercToken = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
     setApprovalForWallet(factory,ercToken,iToken)
     trader = factory.getSmartWallet.call(accounts[0])
     nonce = "1"
@@ -20,7 +20,7 @@ def init_wallet(factory):
     factory.createSmartWallet({'from':accounts[0]}) #create a smart wallet
     mySmartWallet = factory.getSmartWallet.call(accounts[0])
     sw = Contract.from_abi("SmartWallet",mySmartWallet,SmartWallet.abi)
-    BNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+    BNB = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
     ERC20 = interface.IERC(BNB)
     ERC20.transfer(mySmartWallet,1*10**16,{'from':accounts[0]})
 
@@ -31,18 +31,19 @@ def setApprovalForWallet(factory,iERC,spender):
 def submitTrade(smartWallet):
     loanID = "0x0000000000000000000000000000000000000000000000000000000000000000" #ID of loan, set to loan id if the order is for modifying or closing an active position
     feeAmount = "1" #fee amount denominated in the token that is being used
-    iToken = "0x7343b25c4953f4C57ED4D16c33cbEDEFAE9E8Eb9" #iToken contract address which is the iToken for the currency you want to borrow
+    iToken = "0x2E1A74a16e3a9F8e3d825902Ab9fb87c606cB13f" #iToken contract address which is the iToken for the currency you want to borrow
+    loanToken = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     price = str(400*10**18) #execution price of order
     leverage = "2000000000000000000" #leverage for position
     lTokenAmount = "0" #loan token amount
     cTokenAmount = str(9*10**15) #collateral token amount
     isActive = True #does not affect for order placement
-    base = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c" #collateral token address
+    base = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270" #collateral token address
     isCollateral = False #only required for closing position orders, carries no effect otherwise
     nonce = "1" #has no effect
     orderType = "0" #0: limit open position 1: limit close position 2: market stop position
     trader = "0x895B36Cde14604309AeF78b53c1D8DE57f05Ab94" #does not matter what is inputted here
-    tradeOrderStruct = [trader,loanID,feeAmount,iToken,price,leverage,lTokenAmount,cTokenAmount,isActive,base,orderType,isCollateral,nonce]
+    tradeOrderStruct = [trader,loanID,feeAmount,iToken,loanToken,price,leverage,lTokenAmount,cTokenAmount,isActive,base,orderType,isCollateral,nonce]
     smartWallet.submitOrder(tradeOrderStruct,{'from':accounts[0]})
     
 def executeOrder(factory,trader,nonce):
@@ -50,3 +51,4 @@ def executeOrder(factory,trader,nonce):
         factory.executeOrder(trader,nonce,{'from':accounts[0]})
     else:
         print('not executable')
+
