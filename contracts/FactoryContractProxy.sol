@@ -4,8 +4,9 @@ import "./FactoryEvents.sol";
 
 contract FactoryContractProxy is MainWalletEvents, FactoryContractStorage{
 	address internal implementation;
-    constructor(){
+    constructor(address bzx){
         owner = msg.sender;
+		bZxRouterAddress = bzx;
     }
 	function setImpl(address nImpl) public {
 		require(msg.sender == owner);
