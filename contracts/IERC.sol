@@ -1,5 +1,6 @@
 pragma solidity ^0.8.4;
 abstract contract IERC{
+	uint8 public decimals;
     function totalSupply() public virtual view returns(uint);
     function balanceOf(address tOwner) public virtual view returns(uint balance);
     function allowance(address tOwner,address spender) public virtual view returns(uint reamining);
