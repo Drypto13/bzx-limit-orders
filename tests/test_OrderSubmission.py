@@ -26,7 +26,7 @@ def deploy_smart_wallet(accounts,deploy_limit_contracts,LINK,SmartWallet):
     return deploy_limit_contracts, sw
 def test_order_submission(Constants, bzx, DAI, LINK, accounts, web3, deploy_smart_wallet,LoanToken):
     main_contract, smart_wallet = deploy_smart_wallet
-    print(smart_wallet.getBZXRouter())
+    print(main_contract.getFeed())
     smart_wallet.approveERCSpending(LINK.address,accounts[1],10000e18,{'from':accounts[0]})
     loanID = "0x0000000000000000000000000000000000000000000000000000000000000000" #ID of loan, set to loan id if the order is for modifying or closing an active position
     feeAmount = "1" #fee amount denominated in the token that is being used
@@ -45,3 +45,4 @@ def test_order_submission(Constants, bzx, DAI, LINK, accounts, web3, deploy_smar
     smart_wallet.submitOrder(tradeOrderStruct,{'from':accounts[0]})
     assert(main_contract.getTotalOrders(smart_wallet.address) == 1)
     assert(main_contract.getOrderByOrderID(smart_wallet,1)[4] == DAI.address)
+    print(main_contract.dexSwapRate(tradeOrderStruct))

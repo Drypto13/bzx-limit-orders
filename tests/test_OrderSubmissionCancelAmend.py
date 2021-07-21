@@ -7,7 +7,7 @@ def shared_setup(module_isolation):
     pass
 @pytest.fixture(scope="module")
 def deploy_limit_contracts(bzx,accounts,walletFactor,SmartWallet,FactoryContractProxy,walletCreator):
-    factoryContract = walletFactor.deploy({'from':accounts[0]}) #deploy factory
+    factoryContract = walletFactor.deploy(bzx.address,{'from':accounts[0]}) #deploy factory
     smartW = SmartWallet.deploy({'from':accounts[0]})
     proxyFactory = FactoryContractProxy.deploy(bzx.address,{'from':accounts[0]})
     proxyFactory.setImpl(factoryContract.address,{'from':accounts[0]})
@@ -26,7 +26,7 @@ def deploy_smart_wallet(accounts,deploy_limit_contracts,LINK,SmartWallet):
     return deploy_limit_contracts, sw
 def test_orders(Constants, bzx, DAI, LINK, accounts, web3, deploy_smart_wallet,LoanToken):
     main_contract, smart_wallet = deploy_smart_wallet
-    print(smart_wallet.getBZXRouter())
+    print(main_contract.getSwapAddress())
     smart_wallet.approveERCSpending(LINK.address,accounts[1],10000e18,{'from':accounts[0]})
     loanID = "0x0000000000000000000000000000000000000000000000000000000000000000" #ID of loan, set to loan id if the order is for modifying or closing an active position
     feeAmount = "1" #fee amount denominated in the token that is being used
