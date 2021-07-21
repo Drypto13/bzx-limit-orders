@@ -83,8 +83,17 @@ contract walletFactor is MainWalletEvents,FactoryContractStorage{
         return IBZx(getRouter()).getLoan(ID).loanId == ID && ID != 0;
     }
 	function dexSwapRate(IWalletFactory.OpenOrder memory order) public view returns(uint256){
-		uint256 fSwapRate = order.orderType == 0 ? dexSwaps(getSwapAddress()).dexExpectedRate(order.loanTokenAddress,order.base,10**IERC(order.loanTokenAddress).decimals()) : dexSwaps(getSwapAddress()).dexExpectedRate(order.base,order.loanTokenAddress,10**IERC(order.base).decimals());
-		return order.orderType == 0 ? ((1 ether * 1 ether) / (fSwapRate*10**(18-IERC(order.base).decimals()))) : fSwapRate*10**(18-IERC(order.loanTokenAddress).decimals());
+		uint256 tradeSize;
+		if(order.orderType == 0){
+			if(order.loanTokenAmount > 0){
+				tradeSize = (order.loanTokenAmount*order.leverage)/1 ether;
+			}else{
+				(tradeSize,) = dexSwaps(getSwapAddress()).dexAmountOut(order.base,order.loanTokenAddress,order.collateralTokenAmount);
+				tradeSize = (tradeSize*order.leverage)/1 ether;
+			}
+		}
+		(uint256 fSwapRate,) = order.orderType == 0 ? dexSwaps(getSwapAddress()).dexAmountOut(order.loanTokenAddress,order.base,tradeSize) : dexSwaps(getSwapAddress()).dexAmountOut(order.base,order.loanTokenAddress,order.collateralTokenAmount);
+		return order.orderType == 0 ? (fSwapRate*10**(18-IERC(order.base).decimals()) * 1 ether)/(tradeSize*10**(18-IERC(order.loanTokenAddress).decimals())) : (1 ether * (fSwapRate*10**(18-IERC(order.loanTokenAddress).decimals())))/order.collateralTokenAmount;
 	}
     function checkIfExecutable(address smartWallet, uint nonce) public view returns(bool){
         IWalletFactory.OpenOrder memory ord = HistoricalOrders[smartWallet][nonce];
