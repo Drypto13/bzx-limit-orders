@@ -83,7 +83,7 @@ contract walletFactor is MainWalletEvents,FactoryContractStorage{
         return IBZx(getRouter()).getLoan(ID).loanId == ID && ID != 0;
     }
 	function dexSwapRate(IWalletFactory.OpenOrder memory order) public view returns(uint256){
-		(uint256 fSwapRate,) = order.orderType == 0 ? dexSwaps(getSwapAddress()).dexAmountOut(order.loanTokenAddress,order.base,10**IERC(order.loanTokenAddress).decimals()) : dexSwaps(getSwapAddress()).dexAmountOut(order.base,order.loanTokenAddress,10**IERC(order.base).decimals());
+		uint256 fSwapRate = order.orderType == 0 ? dexSwaps(getSwapAddress()).dexExpectedRate(order.loanTokenAddress,order.base,10**IERC(order.loanTokenAddress).decimals()) : dexSwaps(getSwapAddress()).dexExpectedRate(order.base,order.loanTokenAddress,10**IERC(order.base).decimals());
 		return order.orderType == 0 ? ((1 ether * 1 ether) / (fSwapRate*10**(18-IERC(order.base).decimals()))) : fSwapRate*10**(18-IERC(order.loanTokenAddress).decimals());
 	}
     function checkIfExecutable(address smartWallet, uint nonce) public view returns(bool){

@@ -85,4 +85,5 @@ interface IPriceFeeds {
 }
 abstract contract StateI{
     address public priceFeeds;
+	address public swapsImpl;
 }

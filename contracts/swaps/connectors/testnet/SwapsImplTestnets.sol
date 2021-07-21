@@ -7,12 +7,9 @@ pragma solidity ^0.5.17;
 
 import "../../../core/State.sol";
 import "../../../openzeppelin/SafeERC20.sol";
-import "../../ISwapsImpl.sol";
 import "../../../../interfaces/IPriceFeeds.sol";
 import "../../../testhelpers/TestToken.sol";
-
-
-contract SwapsImplTestnets is State, ISwapsImpl {
+contract SwapsImplTestnets is State {
     using SafeERC20 for IERC20;
 
     function dexSwap(
@@ -75,12 +72,9 @@ contract SwapsImplTestnets is State, ISwapsImpl {
     {
         address _priceFeeds = priceFeeds;
         if (_priceFeeds == address(0)) {
-            //keccak256("TestNet_localPriceFeeds")
-            assembly {
-                _priceFeeds := sload(0x42b587029048e5d48be95db5da189bcafe09be3a4fbb99206a1c8f4ced7d89b4)
-            }
+            _priceFeeds = 0xe0aA552A10d7EC8760Fc6c246D391E698a82dDf9;
         }
-        (uint256 expectedRate,) = IPriceFeeds(_priceFeeds).queryRate(
+        (uint256 expectedRate,) = IPriceFeeds(0xe0aA552A10d7EC8760Fc6c246D391E698a82dDf9).queryRate(
             sourceTokenAddress,
             destTokenAddress
         );
