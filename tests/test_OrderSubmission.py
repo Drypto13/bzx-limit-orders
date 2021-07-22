@@ -41,7 +41,8 @@ def test_order_submission(Constants, bzx, DAI, LINK, accounts, web3, deploy_smar
     nonce = "1" #has no effect
     orderType = "0" #0: limit open position 1: limit close position 2: market stop position
     trader = accounts[1].address #does not matter what is inputted here
-    tradeOrderStruct = [trader,loanID,feeAmount,iToken,DAI.address,price,leverage,lTokenAmount,cTokenAmount,isActive,base,orderType,isCollateral,nonce]
+    arbData = ""
+    tradeOrderStruct = [trader,loanID,feeAmount,iToken,DAI.address,price,leverage,lTokenAmount,cTokenAmount,isActive,base,orderType,isCollateral,nonce,arbData]
     smart_wallet.submitOrder(tradeOrderStruct,{'from':accounts[0]})
     assert(main_contract.getTotalOrders(smart_wallet.address) == 1)
     assert(main_contract.getOrderByOrderID(smart_wallet,1)[4] == DAI.address)
