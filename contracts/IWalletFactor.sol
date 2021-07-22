@@ -15,7 +15,7 @@ interface IWalletFactory{
         uint orderType;
         bool isCollateral;
         uint nonce;
-        
+        bytes loanData;
     }
     function getRouter() external view returns(address);
     function placeOrder(OpenOrder calldata Order) external;
