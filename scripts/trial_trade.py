@@ -2,7 +2,7 @@ from brownie import *
 
 def main():
     accounts.load('main3')
-    factoryContract = "0xDc9A918AA30e90B7B0984674013Db50a8D79F1Bc" #factory contract address
+    factoryContract = "0x4e800fB5D8493120f6Bab3496872b59FCc066A6c" #factory contract address
     factory = Contract.from_abi("walletFactor",factoryContract,walletFactor.abi)
     init_wallet(factory)
     iToken = "0x2E1A74a16e3a9F8e3d825902Ab9fb87c606cB13f"
@@ -33,7 +33,7 @@ def submitTrade(smartWallet):
     feeAmount = "1" #fee amount denominated in the token that is being used
     iToken = "0x2E1A74a16e3a9F8e3d825902Ab9fb87c606cB13f" #iToken contract address which is the iToken for the currency you want to borrow
     loanToken = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-    price = str(400*10**18) #execution price of order
+    price = str(835*10**15) #execution price of order
     leverage = "2000000000000000000" #leverage for position
     lTokenAmount = "0" #loan token amount
     cTokenAmount = str(9*10**15) #collateral token amount
@@ -43,7 +43,8 @@ def submitTrade(smartWallet):
     nonce = "1" #has no effect
     orderType = "0" #0: limit open position 1: limit close position 2: market stop position
     trader = "0x895B36Cde14604309AeF78b53c1D8DE57f05Ab94" #does not matter what is inputted here
-    tradeOrderStruct = [trader,loanID,feeAmount,iToken,loanToken,price,leverage,lTokenAmount,cTokenAmount,isActive,base,orderType,isCollateral,nonce]
+    arbData = "" #arbitrary data,not used at this time so leave blank
+    tradeOrderStruct = [trader,loanID,feeAmount,iToken,loanToken,price,leverage,lTokenAmount,cTokenAmount,isActive,base,orderType,isCollateral,nonce,arbData]
     smartWallet.submitOrder(tradeOrderStruct,{'from':accounts[0]})
     
 def executeOrder(factory,trader,nonce):
