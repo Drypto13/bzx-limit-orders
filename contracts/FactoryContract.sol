@@ -15,6 +15,14 @@ interface dexSwaps{
     function dexAmountIn(address sourceTokenAddress,address destTokenAddress,uint256 amountOut) external virtual view returns (uint256 amountIn, address midToken);
 
 }
+interface UniswapFactory{
+	function getPair(address tokenA, address tokenB) external view returns(address pair);
+}
+interface UniswapPair{
+	function token0() external view returns(address);
+	function token1() external view returns(address);
+	function getReserves() external view returns(uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+}
 contract walletFactor is MainWalletEvents,FactoryContractStorage{
 	modifier onlyOwner(){
 		require(msg.sender == owner);_;
@@ -140,9 +148,33 @@ contract walletFactor is MainWalletEvents,FactoryContractStorage{
         }
         return false;
     }
+	function currentDexRate(address src, address dest) public view returns(uint){
+		uint dexRate;
+		if(src == BNBAddress || dest == BNBAddress){
+			address pairAddress = UniswapFactory(UniFactoryContract).getPair(src,dest);
+			(uint112 reserve0,uint112 reserve1,) = UniswapPair(pairAddress).getReserves();
+			uint256 res0 = uint256(reserve0);
+			uint256 res1 = uint256(reserve1);
+			dexRate = UniswapPair(pairAddress).token0() == src ? (res0*10**(18-IERC(UniswapPair(pairAddress).token0()).decimals()+18))/(res1*10**(18-IERC(UniswapPair(pairAddress).token1()).decimals())) : (res1*10**(18-IERC(UniswapPair(pairAddress).token1()).decimals()+18))/res0*10**(18-IERC(UniswapPair(pairAddress).token0()).decimals());
+		}else{
+			address pairAddress0 = UniswapFactory(UniFactoryContract).getPair(src,BNBAddress);
+			(uint112 reserve0,uint112 reserve1,) = UniswapPair(pairAddress0).getReserves();
+			uint256 res0 = uint256(reserve0);
+			uint256 res1 = uint256(reserve1);
+			uint midSwapRate = UniswapPair(pairAddress0).token0() == BNBAddress ? (res1*10**(18-IERC(UniswapPair(pairAddress0).token1()).decimals()+18))/(res0*10**(18-IERC(UniswapPair(pairAddress0).token0()).decimals())) : (res0*10**(18-IERC(UniswapPair(pairAddress0).token0()).decimals()+18))/(res1*10**(18-IERC(UniswapPair(pairAddress0).token0()).decimals()));
+			address pairAddress1 = UniswapFactory(UniFactoryContract).getPair(dest,BNBAddress);
+			(uint112 reserve2,uint112 reserve3,) = UniswapPair(pairAddress1).getReserves();
+			uint256 res2 = uint256(reserve2);
+			uint256 res3 = uint256(reserve3);
+			dexRate = UniswapPair(pairAddress1).token0() == BNBAddress ? ((10**36/((res3*10**(18-IERC(UniswapPair(pairAddress1).token1()).decimals()+18))/(res2*10**(18-IERC(UniswapPair(pairAddress1).token0()).decimals()))))*midSwapRate)/10**18 : ((10**36/((res2*10**(18-IERC(UniswapPair(pairAddress1).token0()).decimals()+18))/(res3*10**(18-IERC(UniswapPair(pairAddress1).token1()).decimals()))))*midSwapRate)/10**18;
+		}
+		return dexRate;
+	}
 	function priceCheck(IWalletFactory.OpenOrder memory monitoredOrder) public view returns(bool){
 		monitoredOrder.collateralTokenAmount = 10+10**IERC(monitoredOrder.base).decimals();
-		return (dexSwapRate(monitoredOrder)*1003)/1000 >= currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base) ? ((dexSwapRate(monitoredOrder)*1003)/1000-currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base))*1000 / ((dexSwapRate(monitoredOrder)*1003)/1000) <= 5 ? true : false : (currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base)-(dexSwapRate(monitoredOrder)*1003)/1000)*1000/ currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base) <= 5 ? true : false;
+		uint dexRate = currentDexRate(monitoredOrder.loanTokenAddress,monitoredOrder.base);
+		uint indexRate = currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base);
+		return dexRate >= indexRate ? (dexRate-indexRate)*1000 / dexRate <= 5 ? true : false : (indexRate-dexRate)*1000/ indexRate <= 5 ? true : false;
 	}
     function executeOrder(address payable smartWallet,uint nonce) public{
         require(isSmartWallet[smartWallet] && HistoricalOrders[smartWallet][nonce].isActive, "non active" );
