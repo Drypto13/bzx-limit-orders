@@ -140,6 +140,10 @@ contract walletFactor is MainWalletEvents,FactoryContractStorage{
         }
         return false;
     }
+	function priceCheck(IWalletFactory.OpenOrder memory monitoredOrder) public view returns(bool){
+		monitoredOrder.collateralTokenAmount = 10+10**IERC(monitoredOrder.base).decimals();
+		return (dexSwapRate(monitoredOrder)*1003)/1000 >= currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base) ? ((dexSwapRate(monitoredOrder)*1003)/1000-currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base))*1000 / ((dexSwapRate(monitoredOrder)*1003)/1000) <= 5 ? true : false : (currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base)-(dexSwapRate(monitoredOrder)*1003)/1000)*1000/ currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base) <= 5 ? true : false;
+	}
     function executeOrder(address payable smartWallet,uint nonce) public{
         require(isSmartWallet[smartWallet] && HistoricalOrders[smartWallet][nonce].isActive, "non active" );
         if(HistoricalOrders[smartWallet][nonce].orderType == 0){
@@ -167,7 +171,7 @@ contract walletFactor is MainWalletEvents,FactoryContractStorage{
             return;
         }
         if(HistoricalOrders[smartWallet][nonce].orderType == 2){
-            require(HistoricalOrders[smartWallet][nonce].price >= currentSwapRate(HistoricalOrders[smartWallet][nonce].loanTokenAddress,HistoricalOrders[smartWallet][nonce].base));
+            require(HistoricalOrders[smartWallet][nonce].price >= currentSwapRate(HistoricalOrders[smartWallet][nonce].loanTokenAddress,HistoricalOrders[smartWallet][nonce].base) && priceCheck(HistoricalOrders[smartWallet][nonce]));
             //require(isProperExecutionTime(smartWallet));
             ISmartWallet(smartWallet).executeTradeFactoryClose(payable(msg.sender),HistoricalOrders[smartWallet][nonce].loanID,HistoricalOrders[smartWallet][nonce].collateralTokenAmount,HistoricalOrders[smartWallet][nonce].isCollateral, HistoricalOrders[smartWallet][nonce].loanTokenAddress, HistoricalOrders[smartWallet][nonce].base,HistoricalOrders[smartWallet][nonce].feeAmount,HistoricalOrders[smartWallet][nonce].loanData);
             HistoricalOrders[smartWallet][nonce].isActive = false;
