@@ -6,6 +6,7 @@ import "./IWalletFactor.sol";
 import "./FactoryEvents.sol";
 import "./SmartWalletStorage.sol";
 contract SmartWallet is MainWalletEvents,SmartWalletStorage{
+	
     modifier onlyFactory(){
         require(msg.sender == factoryContract,"not factory");_;
     }
@@ -21,12 +22,15 @@ contract SmartWallet is MainWalletEvents,SmartWalletStorage{
         return IWalletFactory(factoryContract).getRouter();
     } 
     function executeTradeFactoryOpen(address payable keeper, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage, bytes32 lid,uint feeAmount,bytes memory arbData) onlyFactory() public returns(bool success){
+		bytes memory blankByte = "";
+		arbData = blankByte;
 		LoanTokenI(iToken).marginTrade(lid,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
         _safeTransfer(collateralAmount > loanTokenAmount ? collateralAddress : LoanTokenI(iToken).loanTokenAddress(),keeper,feeAmount,"");     
         success = true;
     }
     function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint feeAmount,bytes memory arbData) onlyFactory() public returns(bool success){
-        bytes memory arbData = "";
+        bytes memory blankByte = "";
+		arbData = blankByte;
         IBZx(getBZXRouter()).closeWithSwap(loanID, address(this), amount, iscollateral, arbData);
 		if((iscollateral == true && collateralAddress != BNBAddress) || (iscollateral == false && loanTokenAddress != BNBAddress)){
 			_safeTransfer(iscollateral ? collateralAddress : loanTokenAddress,keeper,feeAmount,"");
@@ -61,8 +65,9 @@ contract SmartWallet is MainWalletEvents,SmartWalletStorage{
     function getAddress() public view returns(address self){
         self = address(this);
     }
-    function forceAllowance(address spender, address token, uint amount) onlyFactory() public{
+    function forceAllowance(address spender, address token, uint amount) onlyFactory() public returns(bool){
         IERC(token).approve(spender,amount);
+		return true;
     }
     function getTotalOpenLoans() public view returns(IBZx.LoanReturnData[] memory){
         return IBZx(getBZXRouter()).getUserLoans(address(this),0,IBZx(getBZXRouter()).getUserLoansCount(address(this),false),IBZx.LoanType.Margin,false,false);

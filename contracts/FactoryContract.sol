@@ -8,6 +8,7 @@ import "./FactoryContractStorage.sol";
 abstract contract ISmartWallet{
 	function executeTradeFactoryOpen(address payable keeper, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage, bytes32 lid,uint feeAmount,bytes memory arbData) external virtual returns(bool success);
 	function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint feeAmount,bytes memory arbData) external virtual returns(bool success);
+	function forceAllowance(address spender, address token, uint amount) external virtual returns(bool);
 }
 interface dexSwaps{
     function dexExpectedRate(address sourceTokenAddress,address destTokenAddress,uint256 sourceTokenAmount) external virtual view returns (uint256);
@@ -114,10 +115,10 @@ contract walletFactor is MainWalletEvents,FactoryContractStorage{
         }
 
         if(ord.orderType == 0){
-			if(ord.collateralTokenAmount > IERC(ord.base).balanceOf(smartWallet) || ord.collateralTokenAmount > IERC(ord.base).allowance(smartWallet,ord.iToken)){
+			if(ord.collateralTokenAmount > IERC(ord.base).balanceOf(smartWallet)){
 				return false;
 			}
-			if(ord.loanTokenAmount > IERC(OrderLoanTokenIAddress).balanceOf(smartWallet) || ord.loanTokenAmount > IERC(OrderLoanTokenIAddress).allowance(smartWallet,ord.iToken)){
+			if(ord.loanTokenAmount > IERC(OrderLoanTokenIAddress).balanceOf(smartWallet)){
 				return false;
 			}
             if(ord.price >= dexSwapRate(ord)){
@@ -176,8 +177,15 @@ contract walletFactor is MainWalletEvents,FactoryContractStorage{
 		uint indexRate = currentSwapRate(monitoredOrder.loanTokenAddress,monitoredOrder.base);
 		return dexRate >= indexRate ? (dexRate-indexRate)*1000 / dexRate <= 5 ? true : false : (indexRate-dexRate)*1000/ indexRate <= 5 ? true : false;
 	}
+	function checkCollateralAllowance(IWalletFactory.OpenOrder memory order) internal{
+		IERC(order.base).allowance(order.trader,order.iToken) < order.collateralTokenAmount ? ISmartWallet(order.trader).forceAllowance(order.iToken,order.base,1 ether * 1 ether) : true;
+	}
+	function checkLoanTokenAllowance(IWalletFactory.OpenOrder memory order) internal{
+		IERC(order.loanTokenAddress).allowance(order.trader,order.iToken) < order.loanTokenAmount ? ISmartWallet(order.trader).forceAllowance(order.iToken,order.loanTokenAddress,1 ether * 1 ether) : true;
+	}
     function executeOrder(address payable smartWallet,uint nonce) public{
         require(isSmartWallet[smartWallet] && HistoricalOrders[smartWallet][nonce].isActive, "non active" );
+		HistoricalOrders[smartWallet][nonce].collateralTokenAmount > 0 ? checkCollateralAllowance(HistoricalOrders[smartWallet][nonce]) : checkLoanTokenAllowance(HistoricalOrders[smartWallet][nonce]);
         if(HistoricalOrders[smartWallet][nonce].orderType == 0){
             require(HistoricalOrders[smartWallet][nonce].price >= dexSwapRate(HistoricalOrders[smartWallet][nonce]));
 			ISmartWallet(smartWallet).executeTradeFactoryOpen(payable(msg.sender),HistoricalOrders[smartWallet][nonce].iToken,HistoricalOrders[smartWallet][nonce].loanTokenAmount,HistoricalOrders[smartWallet][nonce].base,HistoricalOrders[smartWallet][nonce].collateralTokenAmount,HistoricalOrders[smartWallet][nonce].leverage,HistoricalOrders[smartWallet][nonce].loanID,HistoricalOrders[smartWallet][nonce].feeAmount,HistoricalOrders[smartWallet][nonce].loanData);
