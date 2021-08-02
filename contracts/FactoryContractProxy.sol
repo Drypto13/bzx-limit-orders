@@ -2,7 +2,7 @@ pragma solidity ^0.8.4;
 import "./FactoryContractStorage.sol";
 import "./FactoryEvents.sol";
 
-contract FactoryContractProxy is MainWalletEvents, FactoryContractStorage{
+contract FactoryContractProxy is FactoryEvents, FactoryContractStorage{
 	address internal implementation;
     constructor(address bzx){
         owner = msg.sender;

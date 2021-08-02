@@ -3,20 +3,20 @@ import "./EnumLimits.sol";
 import "./EnumTraders.sol";
 import "./IWalletFactor.sol";
 import "./IERC.sol";
-contract MainWalletEvents{
+contract FactoryEvents{
     using sortOrderInfo for sortOrderInfo.orderSet;
     mapping(address=>bool) internal  hasSmartWallet;
     mapping(address=>address) internal smartWalletOwnership;
     mapping(address=>bool) internal isSmartWallet;
     mapping(address=>mapping(uint=>IWalletFactory.OpenOrder)) internal HistoricalOrders;
     mapping(address=>sortOrderInfo.orderSet) internal HistOrders;
-    mapping(address=>uint) internal HistoricalOrdersNonce;
+    mapping(address=>uint) internal HistoricalOrderIDs;
 	getActiveTraders.orderSet internal activeTraders;
     event NewWallet(address indexed owner,address indexed newSmartWallet);
     event OrderCancelled(address indexed smartWallet,uint nonce);
-    event OrderPlaced(address indexed smartWallet, uint OrderType, uint execution_price,uint nonce, address collateral, address loantoken);
+    event OrderPlaced(address indexed smartWallet, uint indexed OrderType, uint indexed execPrice,uint orderID, address collateralTokenAddress, address loanTokenAddress);
     event OrderExecuted(address indexed smartWallet,uint nonce);
-    event OrderAmended(address indexed smartWallet, uint OrderType, uint execution_price,uint nonce, address collateral, address loantoken);
+    event OrderAmended(address indexed smartWallet, uint indexed OrderType, uint indexed execPrice,uint orderID, address collateralTokenAddress, address loanTokenAddress);
     function _safeTransfer(address token,address to,uint256 amount,string memory error) internal {
         _callOptionalReturn(token,abi.encodeWithSelector(IERC(token).transfer.selector, to, amount),error);
     }

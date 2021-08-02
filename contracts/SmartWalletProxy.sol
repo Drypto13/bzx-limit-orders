@@ -4,7 +4,7 @@ import "./FactoryEvents.sol";
 abstract contract iFactory{
 	function getSmartWalletLogic() external virtual view returns(address);
 }
-contract SmartWalletProxy is MainWalletEvents, SmartWalletStorage{
+contract SmartWalletProxy is FactoryEvents, SmartWalletStorage{
     constructor(address setOwnership,address setFactoryContract){
         owner = setOwnership;
         factoryContract = setFactoryContract;

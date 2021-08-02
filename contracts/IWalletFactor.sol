@@ -14,12 +14,12 @@ interface IWalletFactory{
         address base;
         uint orderType;
         bool isCollateral;
-        uint nonce;
+        uint orderID;
         bytes loanData;
     }
     function getRouter() external view returns(address);
     function placeOrder(OpenOrder calldata Order) external;
-    function amendOrder(OpenOrder calldata Order, uint nonce) external;
-    function cancelOrder(uint nonce) external;
+    function amendOrder(OpenOrder calldata Order, uint orderID) external;
+    function cancelOrder(uint orderID) external;
     
 }

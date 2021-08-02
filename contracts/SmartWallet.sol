@@ -5,7 +5,7 @@ import "./IERC.sol";
 import "./IWalletFactor.sol";
 import "./FactoryEvents.sol";
 import "./SmartWalletStorage.sol";
-contract SmartWallet is MainWalletEvents,SmartWalletStorage{
+contract SmartWallet is FactoryEvents,SmartWalletStorage{
 	
     modifier onlyFactory(){
         require(msg.sender == factoryContract,"not factory");_;
@@ -43,7 +43,7 @@ contract SmartWallet is MainWalletEvents,SmartWalletStorage{
     function submitOrder(IWalletFactory.OpenOrder memory Order) onlyOwner() public{
         IWalletFactory(factoryContract).placeOrder(Order);
     }
-    function amendActiveOrder(IWalletFactory.OpenOrder memory Order, uint nonce) onlyOwner() public{
+    function amendOrder(IWalletFactory.OpenOrder memory Order, uint nonce) onlyOwner() public{
         IWalletFactory(factoryContract).amendOrder(Order,nonce);
     }
     function cancelOrder(uint nonce) onlyOwner() public{
