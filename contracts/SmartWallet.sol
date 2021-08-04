@@ -2,11 +2,14 @@ pragma solidity ^0.8.4;
 import "./bZxInterfaces/ILoanToken.sol";
 import "./bZxInterfaces/IBZx.sol";
 import "./IERC.sol";
+import "./bZxInterfaces/IPriceFeeds.sol";
 import "./IWalletFactor.sol";
 import "./FactoryEvents.sol";
 import "./SmartWalletStorage.sol";
+import "./dexSwaps.sol";
+import "./Utils/SafeMath.sol";
 contract SmartWallet is FactoryEvents,SmartWalletStorage{
-	
+	using SafeMath for uint256;
     modifier onlyFactory(){
         require(msg.sender == factoryContract,"not factory");_;
     }
@@ -20,22 +23,30 @@ contract SmartWallet is FactoryEvents,SmartWalletStorage{
     }
     function getBZXRouter() public view returns (address){
         return IWalletFactory(factoryContract).getRouter();
-    } 
-    function executeTradeFactoryOpen(address payable keeper, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage, bytes32 lid,uint feeAmount,bytes memory arbData) onlyFactory() public returns(bool success){
+    }
+	function gasPrice(address payToken) public view returns(uint){
+		return IPriceFeeds(IWalletFactory(factoryContract).getFeed()).getFastGasPrice(payToken)*2;
+	}
+    function executeTradeFactoryOpen(address payable keeper, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage, bytes32 lid,uint startGas,bytes memory arbData) onlyFactory() public returns(bool success){
 		bytes memory blankByte = "";
 		arbData = blankByte;
 		LoanTokenI(iToken).marginTrade(lid,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
-        _safeTransfer(collateralAmount > loanTokenAmount ? collateralAddress : LoanTokenI(iToken).loanTokenAddress(),keeper,feeAmount,"");     
+		uint256 gasUsed = startGas - gasleft();
+		address usedToken = collateralAmount > loanTokenAmount ? collateralAddress : LoanTokenI(iToken).loanTokenAddress();
+        _safeTransfer(usedToken,keeper,(gasUsed.mul(gasPrice(usedToken))).div(1e36),"");     
         success = true;
     }
-    function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint feeAmount,bytes memory arbData) onlyFactory() public returns(bool success){
+    function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint startGas,bytes memory arbData) onlyFactory() public returns(bool success){
         bytes memory blankByte = "";
 		arbData = blankByte;
         IBZx(getBZXRouter()).closeWithSwap(loanID, address(this), amount, iscollateral, arbData);
 		if((iscollateral == true && collateralAddress != BNBAddress) || (iscollateral == false && loanTokenAddress != BNBAddress)){
-			_safeTransfer(iscollateral ? collateralAddress : loanTokenAddress,keeper,feeAmount,"");
+			uint256 gasUsed = startGas - gasleft();
+			address usedToken = iscollateral ? collateralAddress : loanTokenAddress;
+			_safeTransfer(usedToken,keeper,(gasUsed.mul(gasPrice(usedToken))).div(1e36),"");
 		}else{
-			keeper.call{value:feeAmount}("");
+			uint256 gasUsed = startGas - gasleft();
+			keeper.call{value:(gasUsed.mul(gasPrice(BNBAddress))).div(1e36)}("");
 			WBNB(BNBAddress).deposit{value:address(this).balance}();
 		}
         success = true;

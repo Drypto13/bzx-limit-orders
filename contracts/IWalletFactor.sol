@@ -3,7 +3,6 @@ interface IWalletFactory{
     struct OpenOrder{
         address trader;
         bytes32 loanID;
-        uint feeAmount;
         address iToken;
 		address loanTokenAddress;
         uint price;
@@ -21,5 +20,7 @@ interface IWalletFactory{
     function placeOrder(OpenOrder calldata Order) external;
     function amendOrder(OpenOrder calldata Order, uint orderID) external;
     function cancelOrder(uint orderID) external;
+	function getSwapAddress() external view returns(address);
+	function getFeed() external view returns(address);
     
 }
