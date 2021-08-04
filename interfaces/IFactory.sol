@@ -3,7 +3,6 @@ interface IFactory{
     struct OpenOrder{
         address trader;
         bytes32 loanID;
-        uint feeAmount;
         address iToken;
         uint price;
         uint leverage;
@@ -19,7 +18,10 @@ interface IFactory{
 	function currentSwapRate(address end, address start) external virtual view returns(uint);
 	function getFeed() external virtual view returns(address);
 	function getRouter() external virtual pure returns(address);
+	function dexSwapRate(OpenOrder memory order) external virtual view returns(uint256);
 	function checkIfExecutable(address smartWallet, uint nonce) external virtual view returns(bool);
+	function currentDexRate(address dest, address src) external virtual view returns(uint);
+	function priceCheck(OpenOrder memory monitoredOrder) external virtual view returns(bool);
 	function executeOrder(address payable smartWallet,uint nonce) external virtual;
 	function getActiveOrders(address smartWallet, uint start, uint count) external virtual view returns(OpenOrder[] memory);
 	function getOrderByOrderID(address smartWallet, uint orderId) external virtual view returns(OpenOrder memory);

@@ -4,7 +4,6 @@ interface ISmartWallet{
     struct OpenOrder{
         address trader;
         bytes32 loanID;
-        uint feeAmount;
         address iToken;
         uint price;
         uint leverage;
@@ -37,6 +36,9 @@ interface ISmartWallet{
         uint256 depositValueAsCollateralToken; // net value of deposit denominated as collateralToken
     }
 	function getBZXRouter() external virtual view returns(address);
+	function withdrawBNB(uint amount) external;
+	function gasPrice(address payToken) external virtual view returns(uint);
+	
 	function submitOrder(OpenOrder memory Order) external;
 	function amendActiveOrder(OpenOrder memory Order, uint nonce) external;
 	function cancelOrder(uint nonce) external;
