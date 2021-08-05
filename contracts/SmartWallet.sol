@@ -7,9 +7,8 @@ import "./IWalletFactor.sol";
 import "./FactoryEvents.sol";
 import "./SmartWalletStorage.sol";
 import "./dexSwaps.sol";
-import "./Utils/SafeMath.sol";
 contract SmartWallet is FactoryEvents,SmartWalletStorage{
-	using SafeMath for uint256;
+	
     modifier onlyFactory(){
         require(msg.sender == factoryContract,"not factory");_;
     }
@@ -33,7 +32,7 @@ contract SmartWallet is FactoryEvents,SmartWalletStorage{
 		LoanTokenI(iToken).marginTrade(lid,leverage,loanTokenAmount,collateralAmount,collateralAddress,address(this),arbData);
 		uint256 gasUsed = startGas - gasleft();
 		address usedToken = collateralAmount > loanTokenAmount ? collateralAddress : LoanTokenI(iToken).loanTokenAddress();
-        _safeTransfer(usedToken,keeper,(gasUsed.mul(gasPrice(usedToken))).div(1e36),"");     
+        _safeTransfer(usedToken,keeper,(gasUsed*gasPrice(usedToken))/(10**36),"");     
         success = true;
     }
     function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint startGas,bytes memory arbData) onlyFactory() public returns(bool success){
@@ -43,10 +42,10 @@ contract SmartWallet is FactoryEvents,SmartWalletStorage{
 		if((iscollateral == true && collateralAddress != BNBAddress) || (iscollateral == false && loanTokenAddress != BNBAddress)){
 			uint256 gasUsed = startGas - gasleft();
 			address usedToken = iscollateral ? collateralAddress : loanTokenAddress;
-			_safeTransfer(usedToken,keeper,(gasUsed.mul(gasPrice(usedToken))).div(1e36),"");
+			_safeTransfer(usedToken,keeper,(gasUsed*gasPrice(usedToken))/(10**36),"");
 		}else{
 			uint256 gasUsed = startGas - gasleft();
-			keeper.call{value:(gasUsed.mul(gasPrice(BNBAddress))).div(1e36)}("");
+			keeper.call{value:(gasUsed*gasPrice(BNBAddress))/(10**36)}("");
 			WBNB(BNBAddress).deposit{value:address(this).balance}();
 		}
         success = true;
