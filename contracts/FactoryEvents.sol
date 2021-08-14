@@ -9,8 +9,11 @@ contract FactoryEvents{
     mapping(address=>address) internal smartWalletOwnership;
     mapping(address=>bool) internal isSmartWallet;
     mapping(address=>mapping(uint=>IWalletFactory.OpenOrder)) internal HistoricalOrders;
+	mapping(uint=>IWalletFactory.OrderQueue) AllOrders;
     mapping(address=>sortOrderInfo.orderSet) internal HistOrders;
     mapping(address=>uint) internal HistoricalOrderIDs;
+	mapping(address=>mapping(uint=>uint)) internal matchingID;
+	sortOrderInfo.orderSet internal AllOrderIDs;
 	getActiveTraders.orderSet internal activeTraders;
     event NewWallet(address indexed owner,address indexed newSmartWallet);
     event OrderCancelled(address indexed smartWallet,uint nonce);

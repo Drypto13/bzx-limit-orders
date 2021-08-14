@@ -16,6 +16,10 @@ interface IWalletFactory{
         uint orderID;
         bytes loanData;
     }
+	struct OrderQueue{
+		address trader;
+		uint orderID;
+	}
     function getRouter() external view returns(address);
     function placeOrder(OpenOrder calldata Order) external;
     function amendOrder(OpenOrder calldata Order, uint orderID) external;
