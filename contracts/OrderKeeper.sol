@@ -33,7 +33,7 @@ contract KeeperManagement{
 		factory = factoryAddress;
 	}
 
-	function checkUpKeep(bytes calldata checkData) public view returns(bool upkeepNeeded, bytes memory performData){
+	function checkUpkeep(bytes calldata checkData) public view returns(bool upkeepNeeded, bytes memory performData){
 		StructInterface.OpenOrder[] memory listOfMainOrders = FactoryCont(factory).getOrders(0,FactoryCont(factory).getTotalActiveOrders());
 		for(uint x =0; x < listOfMainOrders.length; x++){
 			if(FactoryCont(factory).prelimCheck(listOfMainOrders[x].trader,listOfMainOrders[x].orderID) == true){
@@ -44,7 +44,7 @@ contract KeeperManagement{
 		}
 		return (upkeepNeeded,performData);
 	}
-	function performUpKeep(bytes calldata performData) public {
+	function performUpkeep(bytes calldata performData) public {
 		(address trader, uint orderId) = abi.decode(performData,(address,uint));
 		//emit OrderExecuted(trader,orderId);
 		FactoryCont(factory).executeOrder(payable(address(this)), trader, orderId);

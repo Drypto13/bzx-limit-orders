@@ -1,6 +1,7 @@
 pragma solidity ^0.8.4;
 import "./EnumLimits.sol";
 import "./EnumTraders.sol";
+import "./EnumOrders.sol";
 import "./IWalletFactor.sol";
 import "./IERC.sol";
 contract FactoryEvents{
@@ -11,10 +12,14 @@ contract FactoryEvents{
     mapping(address=>mapping(uint=>IWalletFactory.OpenOrder)) internal HistoricalOrders;
 	mapping(uint=>IWalletFactory.OrderQueue) AllOrders;
     mapping(address=>sortOrderInfo.orderSet) internal HistOrders;
+	mapping(address=>getTrades.orderSet) internal ActiveTrades;
     mapping(address=>uint) internal HistoricalOrderIDs;
 	mapping(address=>mapping(uint=>uint)) internal matchingID;
+	mapping(bytes32=>address) internal loanIDOwnership;
+	mapping(address=>mapping(address=>uint)) internal tokenBalancesOfTrader;
 	sortOrderInfo.orderSet internal AllOrderIDs;
 	getActiveTraders.orderSet internal activeTraders;
+
     event NewWallet(address indexed owner,address indexed newSmartWallet);
     event OrderCancelled(address indexed smartWallet,uint nonce);
     event OrderPlaced(address indexed smartWallet, uint indexed OrderType, uint indexed execPrice,uint orderID, address collateralTokenAddress, address loanTokenAddress);

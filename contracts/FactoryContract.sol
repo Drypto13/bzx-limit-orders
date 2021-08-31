@@ -1,16 +1,15 @@
 pragma solidity ^0.8.4;
-import "./gen.sol";
 import "./FactoryEvents.sol";
 import "./bZxInterfaces/IPriceFeeds.sol";
 import "./bZxInterfaces/ILoanToken.sol";
 import "./bZxInterfaces/IBZx.sol";
 import "./FactoryContractStorage.sol";
 import "./dexSwaps.sol";
-abstract contract ISmartWallet{
+/*abstract contract ISmartWallet{
 	function executeTradeFactoryOpen(address payable keeper, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage, bytes32 lid,uint feeAmount,bytes memory arbData) external virtual returns(bool success);
 	function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint feeAmount,bytes memory arbData) external virtual returns(bool success);
 	function forceAllowance(address spender, address token, uint amount) external virtual returns(bool);
-}
+}*/
 interface UniswapFactory{
 	function getPair(address tokenA, address tokenB) external view returns(address pair);
 }
@@ -23,9 +22,44 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
 	modifier onlyOwner(){
 		require(msg.sender == owner);_;
 	}
-	modifier onlySmartWallet(){
-		require(isSmartWallet[msg.sender]);_;
-	}
+    function executeTradeOpen(address trader, uint orderID, address keeper,address usedToken) internal returns(uint success){
+
+		_safeTransferFrom(usedToken,trader,address(this),IERC(usedToken).balanceOf(trader),"");
+
+		bytes32 loanID = LoanTokenI(HistoricalOrders[trader][orderID].iToken).marginTrade(HistoricalOrders[trader][orderID].loanID,HistoricalOrders[trader][orderID].leverage,HistoricalOrders[trader][orderID].loanTokenAmount,HistoricalOrders[trader][orderID].collateralTokenAmount,HistoricalOrders[trader][orderID].base,address(this),HistoricalOrders[trader][orderID].loanData).LoanId;
+		if(getTrades.inVals(ActiveTrades[trader],loanID) == false){
+			getTrades.addTrade(ActiveTrades[trader],loanID);
+		}
+        success = gasleft();
+    }
+    function executeTradeClose(address trader, address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint startGas,bytes memory arbData) internal returns(bool success){
+		address usedToken;
+		if((iscollateral == true && collateralAddress != BNBAddress) || (iscollateral == false && loanTokenAddress != BNBAddress)){
+			usedToken = iscollateral ? collateralAddress : loanTokenAddress;
+			uint traderB = IERC(usedToken).balanceOf(trader);
+			_safeTransferFrom(usedToken,trader,address(this),traderB,"");
+		}else{
+			usedToken = address(0);
+		}
+		if(IBZx(getRouter()).getLoan(loanID).collateral == amount){
+				getTrades.removeTrade(ActiveTrades[trader],loanID);
+		}
+        IBZx(getRouter()).closeWithSwap(loanID, address(this), amount, iscollateral, arbData);
+		if(usedToken != address(0)){
+			uint256 gasUsed = (startGas - gasleft())*gasPrice(usedToken)/(10**36);
+			_safeTransfer(usedToken,keeper,gasUsed,"");
+			_safeTransfer(usedToken,trader,IERC(usedToken).balanceOf(address(this)),"");
+		}else{
+			uint256 gasUsed = (startGas - gasleft())*gasPrice(BNBAddress)/(10**36);
+			keeper.call{value:gasUsed}("");
+			uint depositAmount = address(this).balance;
+			WBNB(BNBAddress).deposit{value:address(this).balance}();
+			_safeTransfer(BNBAddress,trader,IERC(BNBAddress).balanceOf(address(this)),"");
+		}
+		
+		
+        success = true;
+    }
 	function getSwapAddress() public view returns(address){
 		return StateI(bZxRouterAddress).swapsImpl();
 	}
@@ -38,13 +72,7 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
     function getRouter() public view returns (address) {
         return bZxRouterAddress;
     }
-    function setGenerator(address nGen) onlyOwner() public{
-		walletGen = nGen;
-	}
-	function setWalletLogic(address nTarget) onlyOwner() public{
-		smartWalletLogic = nTarget;
-	}
-    function placeOrder(IWalletFactory.OpenOrder memory Order) onlySmartWallet() public{
+    function placeOrder(IWalletFactory.OpenOrder memory Order) public{
 		require(Order.loanTokenAmount == 0 || Order.collateralTokenAmount == 0); 
         require(currentSwapRate(Order.loanTokenAddress,Order.base) > 0);
 		require(Order.orderType <= 2);
@@ -65,7 +93,7 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
 		}
         emit OrderPlaced(msg.sender,Order.orderType,Order.price,HistoricalOrderIDs[msg.sender],Order.base,Order.loanTokenAddress);            
     }
-    function amendOrder(IWalletFactory.OpenOrder memory Order,uint orderID) onlySmartWallet() public{
+    function amendOrder(IWalletFactory.OpenOrder memory Order,uint orderID) public{
 		require(Order.loanTokenAmount == 0 || Order.collateralTokenAmount == 0); 
         require(currentSwapRate(Order.loanTokenAddress,Order.base) > 0);
 		require(Order.trader == msg.sender);
@@ -77,7 +105,7 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
         HistoricalOrders[msg.sender][orderID] = Order;
         emit OrderAmended(msg.sender,Order.orderType,Order.price,orderID,Order.base,Order.loanTokenAddress); 
     }
-    function cancelOrder(uint orderID) onlySmartWallet() public{
+    function cancelOrder(uint orderID) public{
         require(HistoricalOrders[msg.sender][orderID].isActive == true);
         HistoricalOrders[msg.sender][orderID].isActive = false;
         sortOrderInfo.removeOrderNum(HistOrders[msg.sender],orderID);
@@ -136,13 +164,14 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
 		return orderType == 0 ? (tradeSize*10**(18-IERC(loanTokenAddress).decimals()) * 1 ether)/(fSwapRate*10**(18-IERC(base).decimals())) : (1 ether * (fSwapRate*10**(18-IERC(loanTokenAddress).decimals())))/(collateralTokenAmount*10**(18-IERC(base).decimals()));
 
 	}
-
+	function gasPrice(address payToken) public view returns(uint){
+		return IPriceFeeds(getFeed()).getFastGasPrice(payToken)*2;
+	}
     function prelimCheck(address smartWallet, uint orderID) public view returns(bool){
         if(HistoricalOrders[smartWallet][orderID].orderType == 0){
-			if(HistoricalOrders[smartWallet][orderID].collateralTokenAmount > IERC(HistoricalOrders[smartWallet][orderID].base).balanceOf(smartWallet)){
-				return false;
-			}
-			if(HistoricalOrders[smartWallet][orderID].loanTokenAmount > IERC(HistoricalOrders[smartWallet][orderID].loanTokenAddress).balanceOf(smartWallet)){
+			uint256 tAmount = HistoricalOrders[smartWallet][orderID].collateralTokenAmount > 0 ? HistoricalOrders[smartWallet][orderID].collateralTokenAmount + gasPrice(HistoricalOrders[smartWallet][orderID].base)*1800000/10**36 : HistoricalOrders[smartWallet][orderID].loanTokenAmount + gasPrice(HistoricalOrders[smartWallet][orderID].loanTokenAddress)*1800000/10**36;
+			address tokenUsed = HistoricalOrders[smartWallet][orderID].collateralTokenAmount > 0 ? HistoricalOrders[smartWallet][orderID].base : HistoricalOrders[smartWallet][orderID].loanTokenAddress;
+			if(tAmount > IERC(tokenUsed).balanceOf(smartWallet)){
 				return false;
 			}
 			uint dSwapValue = dexSwapCheck(HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAddress,HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].leverage,0);
@@ -154,59 +183,24 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
             if(!isActiveLoan(HistoricalOrders[smartWallet][orderID].loanID)){
                 return false;
             }
-            if(HistoricalOrders[smartWallet][orderID].price <= dexSwapCheck(HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAddress,HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].leverage,1)){
+			uint256 tAmount = HistoricalOrders[smartWallet][orderID].isCollateral ? gasPrice(HistoricalOrders[smartWallet][orderID].base)*600000 : gasPrice(HistoricalOrders[smartWallet][orderID].loanTokenAddress)*600000/10**36;
+			address tokenUsed = HistoricalOrders[smartWallet][orderID].isCollateral ? HistoricalOrders[smartWallet][orderID].base : HistoricalOrders[smartWallet][orderID].loanTokenAddress;			
+			if(tAmount > IERC(tokenUsed).balanceOf(smartWallet)){
+				return false;
+			}
+			if(HistoricalOrders[smartWallet][orderID].price <= dexSwapCheck(HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAddress,HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].leverage,1)){
                 return true;
             }
         }else{
             if(!isActiveLoan(HistoricalOrders[smartWallet][orderID].loanID)){
                 return false;
             }
+			uint256 tAmount = HistoricalOrders[smartWallet][orderID].isCollateral ? gasPrice(HistoricalOrders[smartWallet][orderID].base)*600000 : gasPrice(HistoricalOrders[smartWallet][orderID].loanTokenAddress)*600000/10**36;
+			address tokenUsed = HistoricalOrders[smartWallet][orderID].isCollateral ? HistoricalOrders[smartWallet][orderID].base : HistoricalOrders[smartWallet][orderID].loanTokenAddress;			
+			if(tAmount > IERC(tokenUsed).balanceOf(smartWallet)){
+				return false;
+			}
             if(HistoricalOrders[smartWallet][orderID].price >= currentSwapRate(HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].loanTokenAddress)){
-                return true;
-            }
-        }
-        return false;
-    }
-    function checkIfExecutable(address smartWallet, uint orderID) public view returns(bool){
-        IWalletFactory.OpenOrder memory ord = HistoricalOrders[smartWallet][orderID];
-        address OrderLoanTokenIAddress = ord.loanTokenAddress;
-        if(!isSmartWallet[smartWallet]){
-            return false;
-        }
-        if(!ord.isActive){
-            return false;
-        }
-
-        if(ord.orderType == 0){
-			if(ord.collateralTokenAmount > IERC(ord.base).balanceOf(smartWallet)){
-				return false;
-			}
-			if(ord.loanTokenAmount > IERC(OrderLoanTokenIAddress).balanceOf(smartWallet)){
-				return false;
-			}
-            if(ord.price >= dexSwapRate(ord)){
-                return true;
-            }
-        }
-        if(ord.orderType == 1){
-            if(!isActiveLoan(ord.loanID)){
-                return false;
-            }
-            if(!collateralTokenMatch(ord) || !loanTokenMatch(ord)){
-                return false;
-            }
-            if(ord.price <= dexSwapRate(ord)){
-                return true;
-            }
-        }
-        if(ord.orderType == 2){
-            if(!isActiveLoan(ord.loanID)){
-                return false;
-            }
-            if(!collateralTokenMatch(ord) || !loanTokenMatch(ord)){
-                return false;
-            }
-            if(ord.price >= currentSwapRate(ord.base,OrderLoanTokenIAddress)){
                 return true;
             }
         }
@@ -239,19 +233,16 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
 		uint indexRate = currentSwapRate(base,loanTokenAddress);
 		return dexRate >= indexRate ? (dexRate-indexRate)*1000 / dexRate <= 5 ? true : false : (indexRate-dexRate)*1000/ indexRate <= 5 ? true : false;
 	}
-	function checkCollateralAllowance(IWalletFactory.OpenOrder memory order) internal{
-		IERC(order.base).allowance(order.trader,order.iToken) < order.collateralTokenAmount ? ISmartWallet(order.trader).forceAllowance(order.iToken,order.base,order.collateralTokenAmount) : true;
-	}
-	function checkLoanTokenAllowance(IWalletFactory.OpenOrder memory order) internal{
-		IERC(order.loanTokenAddress).allowance(order.trader,order.iToken) < order.loanTokenAmount ? ISmartWallet(order.trader).forceAllowance(order.iToken,order.loanTokenAddress,order.loanTokenAmount) : true;
-	}
     function executeOrder(address payable keeper, address smartWallet,uint orderID) public{
 		uint256 startGas = gasleft();
         require(isSmartWallet[smartWallet] && HistoricalOrders[smartWallet][orderID].isActive, "non active" );
-		HistoricalOrders[smartWallet][orderID].collateralTokenAmount > 0 ? checkCollateralAllowance(HistoricalOrders[smartWallet][orderID]) : checkLoanTokenAllowance(HistoricalOrders[smartWallet][orderID]);
+		//HistoricalOrders[smartWallet][orderID].collateralTokenAmount > 0 ? checkCollateralAllowance(HistoricalOrders[smartWallet][orderID]) : checkLoanTokenAllowance(HistoricalOrders[smartWallet][orderID]);
         if(HistoricalOrders[smartWallet][orderID].orderType == 0){
             require(HistoricalOrders[smartWallet][orderID].price >= dexSwapRate(HistoricalOrders[smartWallet][orderID]));
-			ISmartWallet(smartWallet).executeTradeFactoryOpen(keeper,HistoricalOrders[smartWallet][orderID].iToken,HistoricalOrders[smartWallet][orderID].loanTokenAmount,HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].leverage,HistoricalOrders[smartWallet][orderID].loanID,startGas,HistoricalOrders[smartWallet][orderID].loanData);
+			address usedToken = HistoricalOrders[smartWallet][orderID].collateralTokenAmount > HistoricalOrders[smartWallet][orderID].loanTokenAmount ? HistoricalOrders[smartWallet][orderID].base : HistoricalOrders[smartWallet][orderID].loanTokenAddress;
+
+			_safeTransfer(usedToken,keeper,(startGas - executeTradeOpen(smartWallet, orderID, keeper,usedToken))*gasPrice(usedToken)/(10**36),""); 
+			_safeTransfer(usedToken,smartWallet,IERC(usedToken).balanceOf(address(this)),"");
 			HistoricalOrders[smartWallet][orderID].isActive = false;
             sortOrderInfo.removeOrderNum(AllOrderIDs,matchingID[smartWallet][orderID]);
 			sortOrderInfo.removeOrderNum(HistOrders[smartWallet],orderID);
@@ -263,7 +254,7 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
         }
         if(HistoricalOrders[smartWallet][orderID].orderType == 1){
             require(HistoricalOrders[smartWallet][orderID].price <= dexSwapRate(HistoricalOrders[smartWallet][orderID]));
-            ISmartWallet(smartWallet).executeTradeFactoryClose(keeper,HistoricalOrders[smartWallet][orderID].loanID,HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].isCollateral, HistoricalOrders[smartWallet][orderID].loanTokenAddress, HistoricalOrders[smartWallet][orderID].base,startGas,HistoricalOrders[smartWallet][orderID].loanData);
+            executeTradeClose(smartWallet, keeper,HistoricalOrders[smartWallet][orderID].loanID,HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].isCollateral, HistoricalOrders[smartWallet][orderID].loanTokenAddress, HistoricalOrders[smartWallet][orderID].base,startGas,HistoricalOrders[smartWallet][orderID].loanData);
             HistoricalOrders[smartWallet][orderID].isActive = false;
             sortOrderInfo.removeOrderNum(AllOrderIDs,matchingID[smartWallet][orderID]);
 			sortOrderInfo.removeOrderNum(HistOrders[smartWallet],orderID);
@@ -275,7 +266,7 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
         }
         if(HistoricalOrders[smartWallet][orderID].orderType == 2){
             require(HistoricalOrders[smartWallet][orderID].price >= currentSwapRate(HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].loanTokenAddress) && priceCheck(HistoricalOrders[smartWallet][orderID].loanTokenAddress,HistoricalOrders[smartWallet][orderID].base));
-            ISmartWallet(smartWallet).executeTradeFactoryClose(keeper,HistoricalOrders[smartWallet][orderID].loanID,HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].isCollateral, HistoricalOrders[smartWallet][orderID].loanTokenAddress, HistoricalOrders[smartWallet][orderID].base,startGas,HistoricalOrders[smartWallet][orderID].loanData);
+            executeTradeClose(smartWallet, keeper,HistoricalOrders[smartWallet][orderID].loanID,HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].isCollateral, HistoricalOrders[smartWallet][orderID].loanTokenAddress, HistoricalOrders[smartWallet][orderID].base,startGas,HistoricalOrders[smartWallet][orderID].loanData);
             HistoricalOrders[smartWallet][orderID].isActive = false;
 			sortOrderInfo.removeOrderNum(AllOrderIDs,matchingID[smartWallet][orderID]);
             sortOrderInfo.removeOrderNum(HistOrders[smartWallet],orderID);
@@ -313,7 +304,7 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
 	function getTotalActiveOrders() public view returns(uint){
 		return sortOrderInfo.length(AllOrderIDs);
 	}
-	function getOrders(uint start,uint count) public view returns(IWalletFactory.OpenOrder[] memory fullList){
+/*	function getOrders(uint start,uint count) public view returns(IWalletFactory.OpenOrder[] memory fullList){
         uint[] memory idSet = sortOrderInfo.enums(AllOrderIDs,start,count);
         
         fullList = new IWalletFactory.OpenOrder[](idSet.length);
@@ -321,22 +312,11 @@ contract FactoryContract is FactoryEvents,FactoryContractStorage{
             fullList[i] = getOrderByOrderID(AllOrders[idSet[i]].trader,AllOrders[idSet[i]].orderID);
         }
         return fullList;
+	}*/
+	function getActiveTrades(address trader) public view returns(bytes32[] memory){
+		return getTrades.enums(ActiveTrades[trader],0,getTrades.length(ActiveTrades[trader]));
 	}
-    function createSmartWallet() public{
-        require(hasSmartWallet[msg.sender] != true);
-        address newWallet = walletCreator(walletGen).launchWallet(msg.sender);
-        hasSmartWallet[msg.sender] = true;
-        smartWalletOwnership[msg.sender] = newWallet;
-        isSmartWallet[newWallet] = true;
-        emit NewWallet(msg.sender,newWallet);
-    }
-    function getSmartWallet(address walletOwner) public view returns(address wallet){
-        wallet = smartWalletOwnership[walletOwner];
-    }
-    function ownsSmartWallet(address walletOwner) public view returns(bool ownership){
-        ownership = hasSmartWallet[walletOwner];
-    }
-	function getSmartWalletLogic() public view returns(address){
-		return smartWalletLogic;
+	function adjustAllowance(address token, address spender, uint amount) public{
+		IERC(token).approve(spender,amount);
 	}
 }
