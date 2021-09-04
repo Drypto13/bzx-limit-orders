@@ -3,15 +3,12 @@ import "./FactoryContractStorage.sol";
 import "./FactoryEvents.sol";
 
 contract FactoryContractProxy is FactoryEvents, FactoryContractStorage{
-	address internal implementation;
+	mapping(bytes4 => address) internal implMatch;
     constructor(address bzx){
         owner = msg.sender;
 		bZxRouterAddress = bzx;
     }
-	function setImpl(address nImpl) public {
-		require(msg.sender == owner);
-		implementation = nImpl;
-	}
+
 	function transferOwner(address nOwner) public{
 		require(msg.sender == owner);
 		owner = nOwner;
@@ -21,7 +18,7 @@ contract FactoryContractProxy is FactoryEvents, FactoryContractStorage{
             return;
         }
 
-        address impl = implementation;
+        address impl = implMatch[msg.sig];
 
         bytes memory data = msg.data;
         assembly {
@@ -34,8 +31,15 @@ contract FactoryContractProxy is FactoryEvents, FactoryContractStorage{
             default { return(ptr, size) }
         }
     }
-    function replaceImplementation(address impl) public{
-        require(msg.sender == owner);
-        implementation = impl;
-    }	
+	function setTargets(bytes4[] calldata sigs, address[] calldata targets) public{
+		require(msg.sender == owner);
+		require(sigs.length == targets.length);
+		for(uint i = 0;i<targets.length;i++){
+			implMatch[sigs[i]] = targets[i];
+		}
+	}
+	function getTarget(bytes4 sig) public view returns(address){
+		return implMatch[sig];
+	}
+		
 }
