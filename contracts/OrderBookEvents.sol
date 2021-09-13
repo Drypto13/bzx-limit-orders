@@ -4,7 +4,7 @@ import "./EnumTraders.sol";
 import "./EnumOrders.sol";
 import "./IWalletFactor.sol";
 import "./IERC.sol";
-contract FactoryEvents{
+contract OrderBookEvents{
     using sortOrderInfo for sortOrderInfo.orderSet;
     mapping(address=>bool) internal  hasSmartWallet;
     mapping(address=>address) internal smartWalletOwnership;
