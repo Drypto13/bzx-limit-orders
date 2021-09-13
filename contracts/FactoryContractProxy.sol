@@ -1,8 +1,8 @@
 pragma solidity ^0.8.4;
-import "./FactoryContractStorage.sol";
-import "./FactoryEvents.sol";
+import "./OrderBookStorage.sol";
+import "./OrderBookEvents.sol";
 
-contract FactoryContractProxy is FactoryEvents, FactoryContractStorage{
+contract OrderBookProxy is OrderBookEvents, OrderBookStorage{
 	mapping(bytes4 => address) internal implMatch;
     constructor(address bzx){
         owner = msg.sender;
