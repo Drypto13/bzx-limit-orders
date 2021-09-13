@@ -1,15 +1,10 @@
 pragma solidity ^0.8.4;
-import "./FactoryEvents.sol";
+import "./OrderBookEvents.sol";
 import "./bZxInterfaces/IPriceFeeds.sol";
 import "./bZxInterfaces/ILoanToken.sol";
 import "./bZxInterfaces/IBZx.sol";
-import "./FactoryContractStorage.sol";
+import "./OrderBookStorage.sol";
 import "./dexSwaps.sol";
-/*abstract contract ISmartWallet{
-	function executeTradeFactoryOpen(address payable keeper, address iToken, uint loanTokenAmount, address collateralAddress, uint collateralAmount, uint leverage, bytes32 lid,uint feeAmount,bytes memory arbData) external virtual returns(bool success);
-	function executeTradeFactoryClose(address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint feeAmount,bytes memory arbData) external virtual returns(bool success);
-	function forceAllowance(address spender, address token, uint amount) external virtual returns(bool);
-}*/
 interface UniswapFactory{
 	function getPair(address tokenA, address tokenB) external view returns(address pair);
 }
@@ -18,7 +13,7 @@ interface UniswapPair{
 	function token1() external view returns(address);
 	function getReserves() external view returns(uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
 }
-contract FactoryContract is FactoryEvents,FactoryContractStorage{
+contract OrderBook is OrderBookEvents,OrderBookStorage{
 	modifier onlyOwner(){
 		require(msg.sender == owner);_;
 	}
