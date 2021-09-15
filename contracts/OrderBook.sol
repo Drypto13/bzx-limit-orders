@@ -2,9 +2,10 @@ pragma solidity ^0.8.4;
 import "./OrderBookEvents.sol";
 import "./bZxInterfaces/IPriceFeeds.sol";
 import "./bZxInterfaces/ILoanToken.sol";
-import "./bZxInterfaces/IBZx.sol";
+import "./bZxInterfaces/IBZX.sol";
 import "./OrderBookStorage.sol";
 import "./dexSwaps.sol";
+
 interface UniswapFactory{
 	function getPair(address tokenA, address tokenB) external view returns(address pair);
 }
@@ -46,10 +47,10 @@ contract OrderBook is OrderBookEvents,OrderBookStorage{
 		}else{
 			usedToken = address(0);
 		}
-		if(IBZx(getRouter()).getLoan(loanID).collateral == amount){
+		if(IBZX(getRouter()).getLoan(loanID).collateral == amount){
 				getTrades.removeTrade(ActiveTrades[trader],loanID);
 		}
-        IBZx(getRouter()).closeWithSwap(loanID, address(this), amount, iscollateral, arbData);
+        IBZX(getRouter()).closeWithSwap(loanID, address(this), amount, iscollateral, arbData);
 	}
     function executeTradeClose(address trader, address payable keeper, bytes32 loanID, uint amount, bool iscollateral,address loanTokenAddress, address collateralAddress,uint startGas,bytes memory arbData) internal returns(bool success){
 		address usedToken;
@@ -60,10 +61,10 @@ contract OrderBook is OrderBookEvents,OrderBookStorage{
 		}else{
 			usedToken = address(0);
 		}
-		if(IBZx(getRouter()).getLoan(loanID).collateral == amount){
+		if(IBZX(getRouter()).getLoan(loanID).collateral == amount){
 				getTrades.removeTrade(ActiveTrades[trader],loanID);
 		}
-        IBZx(getRouter()).closeWithSwap(loanID, address(this), amount, iscollateral, arbData);
+        IBZX(getRouter()).closeWithSwap(loanID, address(this), amount, iscollateral, arbData);
 		if(usedToken != address(0)){
 			uint256 gasUsed = (startGas - gasleft())*gasPrice(usedToken)/(10**36);
 			_safeTransfer(usedToken,keeper,gasUsed,"");
@@ -102,6 +103,8 @@ contract OrderBook is OrderBookEvents,OrderBookStorage{
         require(currentSwapRate(Order.loanTokenAddress,Order.base) > 0);
 		require(Order.orderType <= 2);
 		require(Order.orderType > 0 ? collateralTokenMatch(Order) && loanTokenMatch(Order) : true);
+		require(Order.orderType == 0 ? Order.loanID.length == 0 || isActiveLoan(Order.loanID) : isActiveLoan(Order.loanID));
+		require(Order.loanID.length != 0 ? getTrades.inVals(ActiveTrades[msg.sender],Order.loanID) : true);
         HistoricalOrderIDs[msg.sender]++;
 		mainOBID++;
         Order.orderID = HistoricalOrderIDs[msg.sender];
@@ -127,6 +130,8 @@ contract OrderBook is OrderBookEvents,OrderBookStorage{
 		require(Order.isActive == true);
 		require(Order.orderType <= 2);
 		require(Order.orderType > 0 ? collateralTokenMatch(Order) && loanTokenMatch(Order) : true);
+		require(Order.orderType == 0 ? Order.loanID == bytes32(0) || isActiveLoan(msg.sender, Order.loanID) : isActiveLoan(msg.sender, Order.loanID));
+		require(Order.loanID.length != 0 ? getTrades.inVals(ActiveTrades[msg.sender],Order.loanID) : true);
         require(sortOrderInfo.inVals(HistOrders[msg.sender],orderID));
         HistoricalOrders[msg.sender][orderID] = Order;
         emit OrderAmended(msg.sender,Order.orderType,Order.price,orderID,Order.base,Order.loanTokenAddress); 
@@ -142,13 +147,14 @@ contract OrderBook is OrderBookEvents,OrderBookStorage{
         emit OrderCancelled(msg.sender,orderID);
     }
     function collateralTokenMatch(IWalletFactory.OpenOrder memory checkOrder) internal view returns(bool){
-        return IBZx(getRouter()).getLoan(checkOrder.loanID).collateralToken == checkOrder.base;
+        return IBZX(getRouter()).getLoan(checkOrder.loanID).collateralToken == checkOrder.base;
     }
     function loanTokenMatch(IWalletFactory.OpenOrder memory checkOrder) internal view returns(bool){
-        return IBZx(getRouter()).getLoan(checkOrder.loanID).loanToken == checkOrder.loanTokenAddress;
+        return IBZX(getRouter()).getLoan(checkOrder.loanID).loanToken == checkOrder.loanTokenAddress;
     }
-    function isActiveLoan(bytes32 ID) internal view returns(bool){
-        return IBZx(getRouter()).getLoan(ID).loanId == ID && ID != 0;
+    function isActiveLoan(address trader, bytes32 ID) internal view returns(bool){
+		//(,,,,,,,,,,,bool active) = IBZX(getRouter()).loans(ID);
+        return getTrades.inVals(ActiveTrades[trader],ID);
     }
 	function dexSwapRate(IWalletFactory.OpenOrder memory order) public view returns(uint256){
 		uint256 tradeSize;
@@ -193,40 +199,45 @@ contract OrderBook is OrderBookEvents,OrderBookStorage{
 	function gasPrice(address payToken) public view returns(uint){
 		return IPriceFeeds(getFeed()).getFastGasPrice(payToken)*2;
 	}
-    function prelimCheck(address smartWallet, uint orderID) public view returns(bool){
-        if(HistoricalOrders[smartWallet][orderID].orderType == 0){
-			uint256 tAmount = HistoricalOrders[smartWallet][orderID].collateralTokenAmount > 0 ? HistoricalOrders[smartWallet][orderID].collateralTokenAmount + gasPrice(HistoricalOrders[smartWallet][orderID].base)*1800000/10**36 : HistoricalOrders[smartWallet][orderID].loanTokenAmount + gasPrice(HistoricalOrders[smartWallet][orderID].loanTokenAddress)*1800000/10**36;
-			address tokenUsed = HistoricalOrders[smartWallet][orderID].collateralTokenAmount > 0 ? HistoricalOrders[smartWallet][orderID].base : HistoricalOrders[smartWallet][orderID].loanTokenAddress;
-			if(tAmount > IERC(tokenUsed).balanceOf(smartWallet)){
+    function prelimCheck(address trader, uint orderID) public view returns(bool){
+        if(HistoricalOrders[trader][orderID].orderType == 0){
+			if(HistoricalOrders[trader][orderID].loanID.length == 0 || isActiveLoan(trader,HistoricalOrders[trader][orderID].loanID)){
+			
+			}else{
 				return false;
 			}
-			uint dSwapValue = dexSwapCheck(HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAddress,HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].leverage,0);
+			uint256 tAmount = HistoricalOrders[trader][orderID].collateralTokenAmount > 0 ? HistoricalOrders[trader][orderID].collateralTokenAmount + gasPrice(HistoricalOrders[trader][orderID].base)*1800000/10**36 : HistoricalOrders[trader][orderID].loanTokenAmount + gasPrice(HistoricalOrders[trader][orderID].loanTokenAddress)*1800000/10**36;
+			address tokenUsed = HistoricalOrders[trader][orderID].collateralTokenAmount > 0 ? HistoricalOrders[trader][orderID].base : HistoricalOrders[trader][orderID].loanTokenAddress;
+			if(tAmount > IERC(tokenUsed).balanceOf(trader)){
+				return false;
+			}
+			uint dSwapValue = dexSwapCheck(HistoricalOrders[trader][orderID].collateralTokenAmount,HistoricalOrders[trader][orderID].loanTokenAmount,HistoricalOrders[trader][orderID].loanTokenAddress,HistoricalOrders[trader][orderID].base,HistoricalOrders[trader][orderID].leverage,0);
 			
-            if(HistoricalOrders[smartWallet][orderID].price >= dSwapValue && dSwapValue > 0){
+            if(HistoricalOrders[trader][orderID].price >= dSwapValue && dSwapValue > 0){
                 return true;
             }
-        }else if(HistoricalOrders[smartWallet][orderID].orderType == 1){
-            if(!isActiveLoan(HistoricalOrders[smartWallet][orderID].loanID)){
+        }else if(HistoricalOrders[trader][orderID].orderType == 1){
+            if(!isActiveLoan(trader,HistoricalOrders[trader][orderID].loanID)){
                 return false;
             }
-			uint256 tAmount = HistoricalOrders[smartWallet][orderID].isCollateral ? gasPrice(HistoricalOrders[smartWallet][orderID].base)*600000 : gasPrice(HistoricalOrders[smartWallet][orderID].loanTokenAddress)*600000/10**36;
-			address tokenUsed = HistoricalOrders[smartWallet][orderID].isCollateral ? HistoricalOrders[smartWallet][orderID].base : HistoricalOrders[smartWallet][orderID].loanTokenAddress;			
-			if(tAmount > IERC(tokenUsed).balanceOf(smartWallet)){
+			uint256 tAmount = HistoricalOrders[trader][orderID].isCollateral ? gasPrice(HistoricalOrders[trader][orderID].base)*600000 : gasPrice(HistoricalOrders[trader][orderID].loanTokenAddress)*600000/10**36;
+			address tokenUsed = HistoricalOrders[trader][orderID].isCollateral ? HistoricalOrders[trader][orderID].base : HistoricalOrders[trader][orderID].loanTokenAddress;			
+			if(tAmount > IERC(tokenUsed).balanceOf(trader)){
 				return false;
 			}
-			if(HistoricalOrders[smartWallet][orderID].price <= dexSwapCheck(HistoricalOrders[smartWallet][orderID].collateralTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAmount,HistoricalOrders[smartWallet][orderID].loanTokenAddress,HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].leverage,1)){
+			if(HistoricalOrders[trader][orderID].price <= dexSwapCheck(HistoricalOrders[trader][orderID].collateralTokenAmount,HistoricalOrders[trader][orderID].loanTokenAmount,HistoricalOrders[trader][orderID].loanTokenAddress,HistoricalOrders[trader][orderID].base,HistoricalOrders[trader][orderID].leverage,1)){
                 return true;
             }
         }else{
-            if(!isActiveLoan(HistoricalOrders[smartWallet][orderID].loanID)){
+            if(!isActiveLoan(trader,HistoricalOrders[trader][orderID].loanID)){
                 return false;
             }
-			uint256 tAmount = HistoricalOrders[smartWallet][orderID].isCollateral ? gasPrice(HistoricalOrders[smartWallet][orderID].base)*600000 : gasPrice(HistoricalOrders[smartWallet][orderID].loanTokenAddress)*600000/10**36;
-			address tokenUsed = HistoricalOrders[smartWallet][orderID].isCollateral ? HistoricalOrders[smartWallet][orderID].base : HistoricalOrders[smartWallet][orderID].loanTokenAddress;			
-			if(tAmount > IERC(tokenUsed).balanceOf(smartWallet)){
+			uint256 tAmount = HistoricalOrders[trader][orderID].isCollateral ? gasPrice(HistoricalOrders[trader][orderID].base)*600000 : gasPrice(HistoricalOrders[trader][orderID].loanTokenAddress)*600000/10**36;
+			address tokenUsed = HistoricalOrders[trader][orderID].isCollateral ? HistoricalOrders[trader][orderID].base : HistoricalOrders[trader][orderID].loanTokenAddress;			
+			if(tAmount > IERC(tokenUsed).balanceOf(trader)){
 				return false;
 			}
-            if(HistoricalOrders[smartWallet][orderID].price >= currentSwapRate(HistoricalOrders[smartWallet][orderID].base,HistoricalOrders[smartWallet][orderID].loanTokenAddress)){
+            if(HistoricalOrders[trader][orderID].price >= currentSwapRate(HistoricalOrders[trader][orderID].base,HistoricalOrders[trader][orderID].loanTokenAddress)){
                 return true;
             }
         }
@@ -303,45 +314,6 @@ contract OrderBook is OrderBookEvents,OrderBookStorage{
             return;
         }
     }
-/*    function getActiveOrders(address trader, uint start, uint count) public view returns(IWalletFactory.OpenOrder[] memory fullList){
-        uint[] memory idSet = sortOrderInfo.enums(HistOrders[trader],start,count);
-        
-        fullList = new IWalletFactory.OpenOrder[](idSet.length);
-        for(uint i = 0;i<idSet.length;i++){
-            fullList[i] = HistoricalOrders[trader][idSet[i]];
-        }
-        return fullList;
-    }
-    function getOrderByOrderID(address trader, uint orderID) public view returns(IWalletFactory.OpenOrder memory){
-        return HistoricalOrders[trader][orderID];
-    }
-    function getActiveOrderIDs(address trader, uint start, uint count) public view returns(uint[] memory){
-        return sortOrderInfo.enums(HistOrders[trader],start,count);
-    }
-    function getTotalOrders(address trader) public view returns(uint){
-        return sortOrderInfo.length(HistOrders[trader]);
-    }
-	function getTradersWithOrders(uint start, uint count) public view returns(address[] memory){
-		return getActiveTraders.enums(activeTraders,start,count);
-	}
-	function getTotalTradersWithOrders() public view returns(uint){
-		return getActiveTraders.length(activeTraders);
-	}
-	function getTotalActiveOrders() public view returns(uint){
-		return sortOrderInfo.length(AllOrderIDs);
-	}
-	function getOrders(uint start,uint count) public view returns(IWalletFactory.OpenOrder[] memory fullList){
-        uint[] memory idSet = sortOrderInfo.enums(AllOrderIDs,start,count);
-        
-        fullList = new IWalletFactory.OpenOrder[](idSet.length);
-        for(uint i = 0;i<idSet.length;i++){
-            fullList[i] = getOrderByOrderID(AllOrders[idSet[i]].trader,AllOrders[idSet[i]].orderID);
-        }
-        return fullList;
-	}
-	function getActiveTrades(address trader) public view returns(bytes32[] memory){
-		return getTrades.enums(ActiveTrades[trader],0,getTrades.length(ActiveTrades[trader]));
-	}*/
 
 	function adjustAllowance(address token, address spender, uint amount) public{
 		IERC(token).approve(spender,amount);

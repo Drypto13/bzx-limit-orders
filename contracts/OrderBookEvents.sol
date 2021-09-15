@@ -16,11 +16,8 @@ contract OrderBookEvents{
     mapping(address=>uint) internal HistoricalOrderIDs;
 	mapping(address=>mapping(uint=>uint)) internal matchingID;
 	mapping(bytes32=>address) internal loanIDOwnership;
-	mapping(address=>mapping(address=>uint)) internal tokenBalancesOfTrader;
 	sortOrderInfo.orderSet internal AllOrderIDs;
 	getActiveTraders.orderSet internal activeTraders;
-
-    event NewWallet(address indexed owner,address indexed newSmartWallet);
     event OrderCancelled(address indexed smartWallet,uint nonce);
     event OrderPlaced(address indexed smartWallet, uint indexed OrderType, uint indexed execPrice,uint orderID, address collateralTokenAddress, address loanTokenAddress);
     event OrderExecuted(address indexed smartWallet,uint nonce);
